@@ -1,4 +1,3 @@
-from matplotlib import pyplot as plt
 import numpy as np
 import deepxde as dde
 import tensorflow as tf
@@ -18,26 +17,26 @@ def create_pinn_model(t_grid, solution_values, oxides):
     t_end = dde.Variable(2.2, dtype="float64")
 
     # helper functions
-    def T(t):
+    def temperature(t):
         """Temperature function"""
         return t + (100 * t_shift)
 
-    def dT_t(t):
+    def temperature_derivative(_):
         """Temperature derivative"""
         return 1
 
     def f(t, k, e):
         """f(t) = K - E/T(t)"""
-        return (k * 1e+1) - 1e+5 * e / T(t)
+        return (k * 1e+1) - 1e+5 * e / temperature(t)
 
     def df_t(t, e):
         """f'(t) = (E * T'(t)) / (T(t))^2"""
-        return (1e+5 * e * dT_t(t)) / (T(t) ** 2)
+        return (1e+5 * e * temperature_derivative(t)) / (temperature(t) ** 2)
 
     def baseline_function(t):
         """Baseline function"""
         return baseline_h / (
-                1 + tf.exp(-4 * (T(t) - (t_beg * 1000 + t_end * 1000) / 2) / (t_end * 1000 - t_beg * 1000)))
+                1 + tf.exp(-4 * (temperature(t) - (t_beg * 1000 + t_end * 1000) / 2) / (t_end * 1000 - t_beg * 1000)))
 
     def ode(t, v):
         """ode system: v'(t) = v(t)(df_t - exp(f(t)))"""
@@ -91,4 +90,3 @@ def create_pinn_model(t_grid, solution_values, oxides):
     variable = dde.callbacks.VariableValue(external_trainable_variables, period=500, filename="variables.dat")
 
     return model, external_trainable_variables, variable
-
