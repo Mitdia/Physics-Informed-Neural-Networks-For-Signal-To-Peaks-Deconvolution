@@ -22,11 +22,11 @@ def create_oxide_function(K, E, V_0, t_0):
     return oxide_function
 
 
-def create_baseline_function(H, T_beg, T_end):
+def create_baseline_function(h, t_beg, t_end):
 
     def baseline_function(t):
         """f_b(T) = H / (1 + exp(-4(T - (T_end + T_beg) / 2)/ (T_end - T_beg)))"""
-        return H / (1 + np.exp(-4 * ((1600 + t) - (T_beg + T_end) / 2) / (T_end - T_beg)))
+        return h / (1 + np.exp(-4 * ((1600 + t) - (t_beg + t_end) / 2) / (t_end - t_beg)))
 
     return baseline_function
 
