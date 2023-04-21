@@ -46,7 +46,7 @@ def create_pinn_model(t_grid, solution_values, oxides):
         dv3_t = dde.grad.jacobian(v3, t)
         return [dv1_t - v1 * (df_t(t, oxides[0]["E"]) - tf.math.exp(f(t, oxides[0]["K"], oxides[0]["E"]))),
                 dv2_t - v2 * (df_t(t, oxides[1]["E"]) - tf.math.exp(f(t, oxides[1]["K"], oxides[1]["E"]))),
-                dv3_t - v3 * (df_t(t, oxides[2]["E"]) - tf.math.exp(f(t, oxides[2]["K"], oxides[1]["E"]))),
+                dv3_t - v3 * (df_t(t, oxides[2]["E"]) - tf.math.exp(f(t, oxides[2]["K"], oxides[2]["E"]))),
                 baseline - baseline_function(t),
                 v_sum - (v1 + v2 + v3 + baseline)]
 

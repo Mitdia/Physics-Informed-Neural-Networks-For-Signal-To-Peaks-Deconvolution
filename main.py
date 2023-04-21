@@ -1,6 +1,6 @@
 from examples.test_three_oxides_with_baseline import test_inverse_problem
 import deepxde as dde
-import matplotlib as mpl
+
 
 dde.config.set_random_seed(42)
 dde.config.set_default_float("float64")
