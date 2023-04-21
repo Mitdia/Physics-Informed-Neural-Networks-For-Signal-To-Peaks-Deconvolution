@@ -6,12 +6,14 @@ import tensorflow as tf
 def create_pinn_model(t_grid, solution_values, oxides):
 
     # initialize external trainable variables
-    # v_initial = [dde.Variable(0.33, dtype="float64") for i in range(len(oxides))]
+    num_oxides = len(oxides)
+    v_initial = [dde.Variable(0.33, dtype="float64") for _ in range(num_oxides)]
+    # v_01 = dde.Variable(0.33, dtype="float64")
+    # v_02 = dde.Variable(0.33, dtype="float64")
+    # v_03 = dde.Variable(0.33, dtype="float64")
 
-    v_01 = dde.Variable(0.33, dtype="float64")
-    v_02 = dde.Variable(0.33, dtype="float64")
-    v_03 = dde.Variable(0.33, dtype="float64")
     t_shift = dde.Variable(15.8, dtype="float64")
+
     baseline_h = dde.Variable(5, dtype="float64")
     t_beg = dde.Variable(1.6, dtype="float64")
     t_end = dde.Variable(2.2, dtype="float64")
@@ -38,6 +40,12 @@ def create_pinn_model(t_grid, solution_values, oxides):
         return baseline_h / (
                 1 + tf.exp(-4 * (temperature(t) - (t_beg * 1000 + t_end * 1000) / 2) / (t_end * 1000 - t_beg * 1000)))
 
+    def boundaries_condition_gen(oxide_index):
+
+        def boundary_func(_):
+            return v_initial[oxide_index]
+        return boundary_func
+
     def ode(t, v):
         """ode system: v'(t) = v(t)(df_t - exp(f(t)))"""
         v1, v2, v3, baseline, v_sum = v[:, 0:1], v[:, 1:2], v[:, 2:3], v[:, 3:4], v[:, 4:]
@@ -60,15 +68,15 @@ def create_pinn_model(t_grid, solution_values, oxides):
 
     geom = dde.geometry.TimeDomain(0, 600)
 
-    ic1 = dde.icbc.IC(geom, func=lambda t: v_01,
+    ic1 = dde.icbc.IC(geom, func=boundaries_condition_gen(0),
                       on_initial=lambda t, on_initial: np.isclose(t[0], oxides[0]["t_initial"]),
                       component=0)
 
-    ic2 = dde.icbc.IC(geom, func=lambda t: v_02,
+    ic2 = dde.icbc.IC(geom, func=boundaries_condition_gen(1),
                       on_initial=lambda t, on_initial: np.isclose(t[0], oxides[1]["t_initial"]),
                       component=1)
 
-    ic3 = dde.icbc.IC(geom, func=lambda t: v_03,
+    ic3 = dde.icbc.IC(geom, func=boundaries_condition_gen(2),
                       on_initial=lambda t, on_initial: np.isclose(t[0], oxides[2]["t_initial"]),
                       component=2)
 
@@ -82,11 +90,11 @@ def create_pinn_model(t_grid, solution_values, oxides):
                         0, 0, anchors=t_grid_with_initial_t,
                         train_distribution="uniform")
 
-    net = dde.nn.FNN([1] + [50] * 3 + [4], ["tanh"] * 3 + ["relu"], "Glorot uniform")
+    net = dde.nn.FNN([1] + [50] * 3 + [num_oxides + 1], ["tanh"] * 3 + ["relu"], "Glorot uniform")
     net.apply_output_transform(transform_output)
     model = dde.Model(data, net)
 
-    external_trainable_variables = [v_01, v_02, v_03, t_shift, baseline_h, t_beg, t_end]
+    external_trainable_variables = v_initial + [t_shift, baseline_h, t_beg, t_end]
     variable = dde.callbacks.VariableValue(external_trainable_variables, period=500, filename="variables.dat")
 
     return model, external_trainable_variables, variable
