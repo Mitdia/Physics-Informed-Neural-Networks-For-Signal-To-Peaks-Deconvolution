@@ -1,2 +1,9 @@
 *.dat
 data
+/.idea/.gitignore
+/.idea/misc.xml
+/.idea/modules.xml
+/.idea/other.xml
+/.idea/Physics-Informed-Neural-Networks-For-Signal-To-Peaks-Deconvolution.iml
+/.idea/inspectionProfiles/profiles_settings.xml
+/.idea/vcs.xml
