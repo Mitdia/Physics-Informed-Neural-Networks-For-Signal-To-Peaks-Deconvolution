@@ -81,11 +81,11 @@ def create_pinn_model(t_grid, solution_values, oxides):
                                               on_initial=is_close_to_initial,
                                               component=i))
 
-    observe_v = dde.icbc.PointSetBC(t_grid, solution_values, component=num_oxides + 1)
+    observed_v = dde.icbc.PointSetBC(t_grid, solution_values, component=num_oxides + 1)
     t_grid_with_initial_t = np.concatenate([t_grid,
                                             np.array([oxides[i]["t_initial"] for i in range(num_oxides)]).reshape(-1,
                                                                                                                   1)])
-    initial_conditions.append(observe_v)
+    initial_conditions.append(observed_v)
     print(initial_conditions)
     data = dde.data.PDE(geom, ode,
                         initial_conditions,
