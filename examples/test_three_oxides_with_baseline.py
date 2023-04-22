@@ -37,7 +37,7 @@ def test_inverse_problem(sigma, oxides, baseline_parameters):
     loss_weights = [1e+5, 1e+5, 1e+5, 100, 1, 1, 1, 1, 100]
     model.compile("adam", lr=3e-4 / 2, loss_weights=loss_weights,
                   external_trainable_variables=external_trainable_variables)
-    loss_history, train_state = model.train(iterations=50000, callbacks=[variable])
+    loss_history, train_state = model.train(iterations=100000, callbacks=[variable])
     dde.saveplot(loss_history, train_state, issave=True, isplot=True)
 
     # train lbfgs
