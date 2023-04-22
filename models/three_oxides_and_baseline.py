@@ -1,16 +1,13 @@
+
 import numpy as np
 import deepxde as dde
 import tensorflow as tf
 
 
 def create_pinn_model(t_grid, solution_values, oxides):
-
     # initialize external trainable variables
     num_oxides = len(oxides)
     v_initial = [dde.Variable(0.33, dtype="float64") for _ in range(num_oxides)]
-    # v_01 = dde.Variable(0.33, dtype="float64")
-    # v_02 = dde.Variable(0.33, dtype="float64")
-    # v_03 = dde.Variable(0.33, dtype="float64")
 
     t_shift = dde.Variable(15.8, dtype="float64")
 
@@ -40,53 +37,58 @@ def create_pinn_model(t_grid, solution_values, oxides):
         return baseline_h / (
                 1 + tf.exp(-4 * (temperature(t) - (t_beg * 1000 + t_end * 1000) / 2) / (t_end * 1000 - t_beg * 1000)))
 
-    def boundaries_condition_gen(oxide_index):
-
-        def boundary_func(_):
+    def initial_condition_gen(oxide_index):
+        def initial_function(_):
             return v_initial[oxide_index]
-        return boundary_func
+
+        def close_to_initial(t, _):
+            return np.isclose(t[0], oxides[oxide_index]["t_initial"])
+
+        return initial_function, close_to_initial
 
     def ode(t, v):
         """ode system: v'(t) = v(t)(df_t - exp(f(t)))"""
-        v1, v2, v3, baseline, v_sum = v[:, 0:1], v[:, 1:2], v[:, 2:3], v[:, 3:4], v[:, 4:]
-        dv1_t = dde.grad.jacobian(v1, t)
-        dv2_t = dde.grad.jacobian(v2, t)
-        dv3_t = dde.grad.jacobian(v3, t)
-        return [dv1_t - v1 * (df_t(t, oxides[0]["E"]) - tf.math.exp(f(t, oxides[0]["K"], oxides[0]["E"]))),
-                dv2_t - v2 * (df_t(t, oxides[1]["E"]) - tf.math.exp(f(t, oxides[1]["K"], oxides[1]["E"]))),
-                dv3_t - v3 * (df_t(t, oxides[2]["E"]) - tf.math.exp(f(t, oxides[2]["K"], oxides[2]["E"]))),
-                baseline - baseline_function(t),
-                v_sum - (v1 + v2 + v3 + baseline)]
+        oxide_functions = [v[:, j:j + 1] for j in range(num_oxides)]
+        oxides_functions_derivatives = [dde.grad.jacobian(oxide_functions[j], t) for j in range(num_oxides)]
+        baseline, v_sum = v[:, num_oxides:num_oxides + 1], v[:, num_oxides + 1:]
+        oxides_odes = [oxides_functions_derivatives[j] - oxide_functions[j] * (
+                    df_t(t, oxides[j]["E"]) - tf.math.exp(f(t, oxides[j]["K"], oxides[j]["E"]))) for j in
+                       range(num_oxides)]
+        oxide_functions_sum = 0
+        for j in range(num_oxides):
+            oxide_functions_sum += oxide_functions[j]
+        other_equations = [baseline - baseline_function(t),
+                           v_sum - (oxide_functions_sum + baseline)]
+        return oxides_odes + other_equations
 
     def transform_output(_, v):
-        v1 = tf.math.exp(v[:, 0:1])
-        v2 = tf.math.exp(v[:, 1:2])
-        v3 = tf.math.exp(v[:, 2:3])
-        baseline = v[:, 3:4]
-        new_v = tf.reshape(tf.stack([v1, v2, v3, baseline, v1 + v2 + v3 + baseline], axis=1), (-1, 5))
+        oxide_functions = [tf.math.exp(v[:, j:j + 1]) for j in range(num_oxides)]
+        baseline = v[:, num_oxides:num_oxides + 1]
+        oxide_functions_sum = 0
+        for j in range(num_oxides):
+            oxide_functions_sum += oxide_functions[j]
+        new_v = tf.reshape(tf.stack(
+            oxide_functions + [baseline, oxide_functions_sum + baseline],
+            axis=1), (-1, num_oxides + 2))
         return new_v
 
     geom = dde.geometry.TimeDomain(0, 600)
 
-    ic1 = dde.icbc.IC(geom, func=boundaries_condition_gen(0),
-                      on_initial=lambda t, on_initial: np.isclose(t[0], oxides[0]["t_initial"]),
-                      component=0)
+    initial_conditions = []
+    for i in range(num_oxides):
+        initial_condition, is_close_to_initial = initial_condition_gen(i)
+        initial_conditions.append(dde.icbc.IC(geom, func=initial_condition,
+                                              on_initial=is_close_to_initial,
+                                              component=i))
 
-    ic2 = dde.icbc.IC(geom, func=boundaries_condition_gen(1),
-                      on_initial=lambda t, on_initial: np.isclose(t[0], oxides[1]["t_initial"]),
-                      component=1)
-
-    ic3 = dde.icbc.IC(geom, func=boundaries_condition_gen(2),
-                      on_initial=lambda t, on_initial: np.isclose(t[0], oxides[2]["t_initial"]),
-                      component=2)
-
-    observe_v = dde.icbc.PointSetBC(t_grid, solution_values, component=4)
+    observe_v = dde.icbc.PointSetBC(t_grid, solution_values, component=num_oxides + 1)
     t_grid_with_initial_t = np.concatenate([t_grid,
-                                            np.array([oxides[0]["t_initial"],
-                                                      oxides[1]["t_initial"],
-                                                      oxides[2]["t_initial"]]).reshape(-1, 1)])
+                                            np.array([oxides[i]["t_initial"] for i in range(num_oxides)]).reshape(-1,
+                                                                                                                  1)])
+    initial_conditions.append(observe_v)
+    print(initial_conditions)
     data = dde.data.PDE(geom, ode,
-                        [ic1, ic2, ic3, observe_v],
+                        initial_conditions,
                         0, 0, anchors=t_grid_with_initial_t,
                         train_distribution="uniform")
 
