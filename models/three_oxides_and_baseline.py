@@ -11,7 +11,7 @@ def create_pinn_model(t_grid, solution_values, oxides):
 
     t_shift = dde.Variable(15.8, dtype="float64")
 
-    baseline_h = dde.Variable(5, dtype="float64")
+    baseline_h = dde.Variable(1.5, dtype="float64")
     t_beg = dde.Variable(1.6, dtype="float64")
     t_end = dde.Variable(2.2, dtype="float64")
 
@@ -52,7 +52,7 @@ def create_pinn_model(t_grid, solution_values, oxides):
         oxides_functions_derivatives = [dde.grad.jacobian(oxide_functions[j], t) for j in range(num_oxides)]
         baseline, v_sum = v[:, num_oxides:num_oxides + 1], v[:, num_oxides + 1:]
         oxides_odes = [oxides_functions_derivatives[j] - oxide_functions[j] * (
-                    df_t(t, oxides[j]["E"]) - tf.math.exp(f(t, oxides[j]["K"], oxides[j]["E"]))) for j in
+                df_t(t, oxides[j]["E"]) - tf.math.exp(f(t, oxides[j]["K"], oxides[j]["E"]))) for j in
                        range(num_oxides)]
         oxide_functions_sum = 0
         for j in range(num_oxides):
@@ -72,7 +72,7 @@ def create_pinn_model(t_grid, solution_values, oxides):
             axis=1), (-1, num_oxides + 2))
         return new_v
 
-    geom = dde.geometry.TimeDomain(0, 600)
+    geom = dde.geometry.TimeDomain(0, 650)
 
     initial_conditions = []
     for i in range(num_oxides):
@@ -99,4 +99,4 @@ def create_pinn_model(t_grid, solution_values, oxides):
     external_trainable_variables = v_initial + [t_shift, baseline_h, t_beg, t_end]
     variable = dde.callbacks.VariableValue(external_trainable_variables, period=500, filename="variables.dat")
 
-    return model, external_trainable_variables, variable
+    return model, external_trainable_variables, [variable]
