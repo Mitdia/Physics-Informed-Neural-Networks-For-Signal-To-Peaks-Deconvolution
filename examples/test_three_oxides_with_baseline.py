@@ -4,8 +4,10 @@ import numpy as np
 import deepxde as dde
 
 
-def create_reference_solution(sigma, solution_oxides, baseline_parameters, t_shift=1600):
+def create_reference_solution(sigma, solution_oxides, baseline_parameters, t_shift=1600, number_of_points=3000):
     oxide_functions = []
+
+    t_grid = np.linspace(0, 650, number_of_points).reshape(-1, 1).astype("float64")
     for oxide in solution_oxides:
         oxide_functions.append(create_oxide_function(oxide["K"] * 1e1,
                                                      oxide["E"] * 1e5,
@@ -15,8 +17,6 @@ def create_reference_solution(sigma, solution_oxides, baseline_parameters, t_shi
 
     baseline_func = create_baseline_function(**baseline_parameters, t_shift=t_shift)
 
-    number_of_points = 3000
-    t_grid = np.linspace(0, 650, number_of_points).reshape(-1, 1).astype("float64")
     solution = create_solution(oxide_functions + [baseline_func])
     solution_values = solution(t_grid).astype("float64") + np.random.normal(0, sigma, number_of_points).reshape(-1, 1)
 
@@ -34,8 +34,8 @@ def test_inverse_problem(sigma, oxides, baseline_parameters, t_shift=1600, use_l
     model, external_trainable_variables, callbacks = create_pinn_model(t_grid, solution_values, oxides)
 
     # train adam
-    loss_weights = [1e+5] * num_oxides + [5e+3, 1e-0] + [1e-0] * num_oxides + [5e+2]
-    model.compile("adam", lr=1e-4, loss_weights=loss_weights,
+    loss_weights = [1e+5] * num_oxides + [0, 1e-0] + [1e-0] * num_oxides + [5e+2]
+    model.compile("adam", lr=1e-0, loss_weights=loss_weights,
                   external_trainable_variables=external_trainable_variables)
     loss_history, train_state = model.train(iterations=100000, callbacks=callbacks)
     dde.saveplot(loss_history, train_state, issave=True, isplot=True)
